@@ -1,0 +1,56 @@
+pipeline{
+    agent any
+    triggers{
+        pollSCM('* * * * *')
+    }
+    options{
+        timestamps()
+        buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5'))
+    }
+    tools{
+        maven "maven3.6.3"
+    }
+    stages{
+        stage('checkoutcode'){
+        steps{
+             git branch: 'development', credentialsId: '1712f281-fdb4-4a34-9f55-4f8d72dd9991', url: 'https://github.com/githubnagarjun/maven-web-application.git'
+        }    
+        }
+        stage('build'){
+        steps{
+            sh "mvn clean package"
+        }
+        }
+        stage('executesonarqubereport'){
+        steps{
+             sh "mvn clean sonar:sonar"
+         }   
+        }
+        stage('uploadartifactsintonexus'){
+        steps{
+            sh "mvn clean deploy"
+        }
+        }
+        stage('deployapplicationintotomcatserver'){
+        steps{
+            sshagent(['df86fca7-ffe7-4112-9cbc-4ad2eef1c845']) {
+        sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@13.233.41.112:/opt/apache-tomcat-9.0.54/webapps/"
+        }
+    }
+        }
+}//stages closing
+post{
+    success{
+        emailext body: '''build is over - sucess!!
+
+regards,,
+mithuntechnologies,''', subject: 'build is over - sucess!!', to: 'nagarjunreddy326@gmail.com'
+    }
+    failure{
+        emailext body: '''build is over - failure!!
+
+regards,,
+mithuntechnologies,''', subject: 'build is over - failure!!', to: 'nagarjunreddy326@gmail.com'
+    }
+}
+}//pipeline closing
